@@ -191,7 +191,7 @@
   const i = Formio.Components.components.field;
   class l extends i {
     static editForm = a;
-    static Version = "0.0.66-alpha";
+    static Version = "0.0.67-alpha";
     static StoreLocatorEvents = {
       StoreSelected: "store.selected",
       StoreChanged: "store.changed",
@@ -202,6 +202,7 @@
     static LocalStorageKeys = {
       MageCacheStorage: "mage-cache-storage",
       AllFranchisees: "all-franchisees",
+      PreviousStoreLocation: "previous-store-location",
     };
     static MageCacheStorageKeys = { StoreLocation: "store-location" };
     static FormComponentKeys = {
@@ -255,12 +256,30 @@
         gap: "8px",
         "max-height": "200px",
         overflow: "auto",
+        "overscroll-behavior": "contain",
       },
       DropdownItem: {
         color: l.Palette.Primary.Main,
         "text-decoration": "underline",
         cursor: "pointer",
       },
+      HintText: { color: l.Palette.Grey.Text, "font-size": "12px" },
+      PreviousStoreSection: {
+        display: "flex",
+        "flex-direction": "column",
+        gap: "8px",
+      },
+      PreviousStoreLabel: {
+        color: l.Palette.IconColorBlack,
+        "font-weight": "500",
+      },
+      UseLocationContainer: {
+        display: "flex",
+        "align-items": "center",
+        gap: "8px",
+        cursor: "pointer",
+      },
+      LocationIcon: { display: "flex", "flex-shrink": "0" },
       NoMatchingStoresContainer: {
         border: `2px solid ${l.Palette.Warning.Main}`,
         "border-radius": "8px",
@@ -305,7 +324,14 @@
       super(e, t, o);
     }
     init() {
-      if ((super.init(), !this.dataValue)) {
+      if (
+        (super.init(),
+        this.component.validate &&
+          !this.component.validate.customMessage &&
+          (this.component.validate.customMessage =
+            "Please select your store from the list."),
+        !this.dataValue)
+      ) {
         const e = this.getStoreFromLocalStorage();
         e && e.name && (this.dataValue = e.name);
       }
@@ -347,6 +373,24 @@
         );
       }
     }
+    getPreviousStoreFromLocalStorage() {
+      try {
+        const e = localStorage.getItem(
+          l.LocalStorageKeys.PreviousStoreLocation,
+        );
+        if (!e) return null;
+        const t = JSON.parse(e);
+        return t && t.name ? t : null;
+      } catch (e) {
+        return (
+          console.error({
+            message: "Error reading previous store from localStorage",
+            error: e.message,
+          }),
+          null
+        );
+      }
+    }
     getFranchiseeByStoreId(e, t) {
       if (!t || 0 === t.length) return null;
       const o = t.find((t) => t.storeId === e || t.store_id === e);
@@ -385,7 +429,7 @@
           const e = s.value && "" !== s.value.trim();
           i.innerHTML = e
             ? `\n        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n          <path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41Z" fill="${l.Palette.IconColorBlack}" />\n        </svg>\n      `
-            : `\n        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n          <path d="M12 2C8.13 2 5 5.13 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13 15.87 2 12 2ZM12 11.5C10.62 11.5 9.5 10.38 9.5 9C9.5 7.62 10.62 6.5 12 6.5C13.38 6.5 14.5 7.62 14.5 9C14.5 10.38 13.38 11.5 12 11.5Z" fill="${l.Palette.IconColorBlack}" />\n        </svg>\n        `;
+            : `\n        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n          <path d="M12 4c2.2 0 4 1.79 4 4 0 2.27-2.13 5.65-4 8.06C10.13 13.65 8 10.27 8 8c0-2.21 1.8-4 4-4m0-2C8.69 2 6 4.69 6 8c0 4.5 6 11 6 11s6-6.5 6-11c0-3.31-2.69-6-6-6zm0 4c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5 20v2h14v-2H5z" fill="${l.Palette.IconColorBlack}" />\n        </svg>\n        `;
         },
         p = (e, { writeLocalStorage: n } = {}) => {
           if (!e || !e.name)
@@ -464,23 +508,29 @@
               g());
           }));
       })();
+      const m = (e) => {
+        const o = document.createElement("div"),
+          n = document.createElement("a");
+        return (
+          (n.innerText = e.name),
+          n.addEventListener("click", function (o) {
+            (o.preventDefault(),
+              o.stopPropagation(),
+              p(e, { writeLocalStorage: !0 }),
+              t.dispatchStoreSelectedEvent(e));
+          }),
+          (n.style = l.stylesToCssString(l.Styles.DropdownItem)),
+          o.appendChild(n),
+          o
+        );
+      };
       return (
         i.addEventListener("click", function (e) {
-          if ((e.preventDefault(), e.stopPropagation(), o || "" !== s.value))
-            ((s.value = ""), (o = !1), c(), t.updateValue(""), u());
-          else {
-            (s.focus(),
-              t._geolocateFallbackTimer &&
-                clearTimeout(t._geolocateFallbackTimer));
-            const e = new window.CustomEvent(
-              l.StoreLocatorEvents.StoreGeolocate,
-            );
-            (window.dispatchEvent(e),
-              (t._geolocateFallbackTimer = setTimeout(() => {
-                ((t._geolocateFallbackTimer = null),
-                  t.dispatchStoreSearchEvent("3000"));
-              }, 1500)));
-          }
+          (e.preventDefault(),
+            e.stopPropagation(),
+            o || "" !== s.value
+              ? ((s.value = ""), (o = !1), c(), t.updateValue(""), u())
+              : s.focus());
         }),
         s.addEventListener("focus", function () {
           (s.value && "" !== s.value.trim()) ||
@@ -490,6 +540,7 @@
           const r = e.target.value;
           ((t.userInput = r),
             (o = !1),
+            t.updateValue(""),
             u(),
             n && clearTimeout(n),
             (n = setTimeout(() => {
@@ -529,26 +580,59 @@
               })();
               a.appendChild(e);
             } else {
-              const e = o.map((e) =>
-                ((e) => {
-                  const o = document.createElement("div"),
-                    n = document.createElement("a");
-                  return (
-                    (n.innerText = e.name),
-                    n.addEventListener("click", function (o) {
-                      (o.preventDefault(),
-                        o.stopPropagation(),
-                        p(e, { writeLocalStorage: !0 }),
-                        t.dispatchStoreSelectedEvent(e));
-                    }),
-                    (n.style = l.stylesToCssString(l.Styles.DropdownItem)),
-                    o.appendChild(n),
-                    o
-                  );
-                })(e),
-              );
-              a.append(...e);
+              const e = document.createElement("div");
+              ((e.innerText = "Select a store from the list to continue."),
+                (e.style = l.stylesToCssString(l.Styles.HintText)),
+                a.appendChild(e));
+              const t = o.map((e) => m(e));
+              a.append(...t);
             }
+            const n = (() => {
+              const e = t.getPreviousStoreFromLocalStorage();
+              if (!e) return null;
+              const o = document.createElement("div");
+              o.style = l.stylesToCssString(l.Styles.PreviousStoreSection);
+              const n = document.createElement("div");
+              return (
+                (n.innerText = "Previous Store"),
+                (n.style = l.stylesToCssString(l.Styles.PreviousStoreLabel)),
+                o.appendChild(n),
+                o.appendChild(m(e)),
+                o
+              );
+            })();
+            (n && a.appendChild(n),
+              a.appendChild(
+                (() => {
+                  const e = document.createElement("div");
+                  e.style = l.stylesToCssString(l.Styles.UseLocationContainer);
+                  const o = document.createElement("span");
+                  ((o.style = l.stylesToCssString(l.Styles.LocationIcon)),
+                    (o.innerHTML = `\n        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${l.Palette.Primary.Main}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">\n          <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>\n        </svg>\n      `));
+                  const n = document.createElement("a");
+                  return (
+                    (n.innerText = "Use My Current Location"),
+                    (n.style = l.stylesToCssString(l.Styles.DropdownItem)),
+                    e.addEventListener("click", function (e) {
+                      (e.preventDefault(),
+                        e.stopPropagation(),
+                        t._geolocateFallbackTimer &&
+                          clearTimeout(t._geolocateFallbackTimer));
+                      const o = new window.CustomEvent(
+                        l.StoreLocatorEvents.StoreGeolocate,
+                      );
+                      (window.dispatchEvent(o),
+                        (t._geolocateFallbackTimer = setTimeout(() => {
+                          ((t._geolocateFallbackTimer = null),
+                            t.dispatchStoreSearchEvent("3000"));
+                        }, 1500)));
+                    }),
+                    e.appendChild(o),
+                    e.appendChild(n),
+                    e
+                  );
+                })(),
+              ));
           })(e.detail.stores);
         }),
         window.addEventListener(
