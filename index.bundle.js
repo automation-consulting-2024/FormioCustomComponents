@@ -191,7 +191,7 @@
   const i = Formio.Components.components.field;
   class l extends i {
     static editForm = a;
-    static Version = "0.0.67-alpha";
+    static Version = "0.0.68-alpha";
     static StoreLocatorEvents = {
       StoreSelected: "store.selected",
       StoreChanged: "store.changed",
@@ -533,8 +533,10 @@
               : s.focus());
         }),
         s.addEventListener("focus", function () {
-          (s.value && "" !== s.value.trim()) ||
-            t.dispatchStoreSearchEvent("3000");
+          if (!o && s.value && "" !== s.value.trim()) return;
+          const e = o ? t.getStoreFromLocalStorage() : null,
+            n = (e && (e.postcode || e.post_code)) || "3000";
+          t.dispatchStoreSearchEvent(n);
         }),
         s.addEventListener("input", function (e) {
           const r = e.target.value;
