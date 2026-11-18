@@ -40,7 +40,7 @@
     );
   }
   const o = Formio.Components.components.field;
-  class n extends o {
+  class r extends o {
     static editForm = t;
     static schema(...e) {
       return o.schema({
@@ -62,7 +62,7 @@
         group: "basic",
         documentation: "/userguide/#textfield",
         weight: 0,
-        schema: n.schema(),
+        schema: r.schema(),
       };
     }
     setIconProperties() {
@@ -99,14 +99,14 @@
       if ((this.loadRefs(e, { rating: "single" }), !this.component.disabled)) {
         let e = this.refs.rating.children;
         for (let o = 0; o < e.length; o++) {
-          let n = e[o];
-          n.addEventListener("click", () => {
+          let r = e[o];
+          r.addEventListener("click", () => {
             (t(e, this.component.unfilledColor),
-              (n.style.fill = this.component.filledColor));
-            let r = n.previousElementSibling;
-            for (; r; )
-              ((r.style.fill = this.component.filledColor),
-                (r = r.previousElementSibling));
+              (r.style.fill = this.component.filledColor));
+            let n = r.previousElementSibling;
+            for (; n; )
+              ((n.style.fill = this.component.filledColor),
+                (n = n.previousElementSibling));
             this.updateValue(`${o + 1}/${e.length}`);
           });
         }
@@ -138,7 +138,7 @@
       return super.updateValue(e, t);
     }
   }
-  const r = [
+  const n = [
       {
         type: "textfield",
         key: "storeChangeBtnLabel",
@@ -149,6 +149,15 @@
         type: "textfield",
         key: "storeInitialBtnLabel",
         label: "Store Initial Button Label",
+        input: "true",
+      },
+      {
+        type: "textfield",
+        key: "bffUrl",
+        label: "BFF URL (franchisee list)",
+        placeholder: "https://<bff host>/",
+        tooltip:
+          "Where the component loads the franchisee list from when the chat widget has not saved it. Use the staging BFF on staging forms and the prod BFF on prod forms. Blank = use the chat widget config.",
         input: "true",
       },
       {
@@ -182,7 +191,7 @@
     return Formio.Components.baseEditForm(
       [
         { key: "data", ignore: !0 },
-        { key: "display", components: r },
+        { key: "display", components: n },
         { key: "validation", components: s },
       ],
       ...e,
@@ -191,7 +200,7 @@
   const i = Formio.Components.components.field;
   class l extends i {
     static editForm = a;
-    static Version = "0.0.68-alpha";
+    static Version = "0.0.69-alpha";
     static StoreLocatorEvents = {
       StoreSelected: "store.selected",
       StoreChanged: "store.changed",
@@ -209,6 +218,7 @@
       StoreFormType: "storeFormType",
       FranchiseeEmail: "franchiseeEmail",
       FranchiseeId: "franchiseeId",
+      StoreId: "storeId",
     };
     static Palette = {
       Primary: { Main: "#3e87cb" },
@@ -342,9 +352,9 @@
     render(e) {
       const t = l.stylesToCssString(l.Styles.Input),
         o = l.stylesToCssString(l.Styles.Container),
-        n = l.stylesToCssString(l.Styles.DropdownContainer),
-        r = l.stylesToCssString(l.Styles.IconContainer);
-      let s = `\n    <div ref="storeLocator" style="${o}">\n      <input ref="storeInput" placeholder="${this.component.placeholder || "Enter Your Suburb or Postcode"}" style="${t}"/>\n        <span ref="iconContainer" style="${r}">\n          \x3c!-- Icon will be updated dynamically: pin drop or close --\x3e\n        </span>\n      <div ref="dropdownContainer" style="${n}"></div>\n    </div>\n    `;
+        r = l.stylesToCssString(l.Styles.DropdownContainer),
+        n = l.stylesToCssString(l.Styles.IconContainer);
+      let s = `\n    <div ref="storeLocator" style="${o}">\n      <input ref="storeInput" placeholder="${this.component.placeholder || "Enter Your Suburb or Postcode"}" style="${t}"/>\n        <span ref="iconContainer" style="${n}">\n          \x3c!-- Icon will be updated dynamically: pin drop or close --\x3e\n        </span>\n      <div ref="dropdownContainer" style="${r}"></div>\n    </div>\n    `;
       return super.render(s);
     }
     static stylesToCssString(e, t = {}) {
@@ -373,6 +383,77 @@
         );
       }
     }
+    loadFranchisees() {
+      if (this._franchiseesPromise) return this._franchiseesPromise;
+      const e = this.getAllFranchiseesFromLocalStorage();
+      if (Array.isArray(e) && e.length > 0)
+        return (
+          (this._franchiseesPromise = Promise.resolve(e)),
+          this._franchiseesPromise
+        );
+      const t =
+        this.component.bffUrl ||
+        (window.__appConfig__ && window.__appConfig__.bffUrl);
+      if (!t)
+        return (
+          console.warn("StoreLocator: no bffUrl set, cannot load franchisees"),
+          (this._franchiseesPromise = Promise.resolve([])),
+          this._franchiseesPromise
+        );
+      const o = `${t.replace(/\/?$/, "/")}api/v1/franchisees`;
+      return (
+        (this._franchiseesPromise = fetch(o)
+          .then((e) => {
+            if (!e.ok) throw new Error(`HTTP ${e.status}`);
+            return e.json();
+          })
+          .then((e) => {
+            const t = (e && e.franchisees) || [];
+            return (
+              localStorage.setItem(
+                l.LocalStorageKeys.AllFranchisees,
+                JSON.stringify(t),
+              ),
+              t
+            );
+          })
+          .catch(
+            (e) => (
+              console.error({
+                message: "StoreLocator: unable to load franchisees",
+                url: o,
+                error: e.message,
+              }),
+              (this._franchiseesPromise = null),
+              []
+            ),
+          )),
+        this._franchiseesPromise
+      );
+    }
+    applyFranchiseeForStore(e) {
+      return this.loadFranchisees().then((t) => {
+        const o = this.getFranchiseeByStoreId(e, t);
+        return o
+          ? (this.updateFormComponentValue(
+              l.FormComponentKeys.StoreFormType,
+              o.bmqFormType || o.bmq_form_type,
+            ),
+            this.updateFormComponentValue(
+              l.FormComponentKeys.FranchiseeEmail,
+              o.email,
+            ),
+            this.updateFormComponentValue(
+              l.FormComponentKeys.FranchiseeId,
+              o.id,
+            ),
+            o)
+          : (console.warn("⚠️ No franchisee found for store:", e),
+            this.setFieldValue(l.FormComponentKeys.FranchiseeEmail, ""),
+            this.setFieldValue(l.FormComponentKeys.FranchiseeId, ""),
+            null);
+      });
+    }
     getPreviousStoreFromLocalStorage() {
       try {
         const e = localStorage.getItem(
@@ -393,12 +474,13 @@
     }
     getFranchiseeByStoreId(e, t) {
       if (!t || 0 === t.length) return null;
-      const o = t.find((t) => t.storeId === e || t.store_id === e);
+      const o = String(e),
+        r = t.find((e) => String(e.storeId ?? e.store_id) === o);
       return (
-        o
-          ? console.log("Found franchisee for storeId:", e, o)
+        r
+          ? console.log("Found franchisee for storeId:", e, r)
           : console.log("No franchisee found for storeId:", e),
-        o || null
+        r || null
       );
     }
     attach(e) {
@@ -410,154 +492,133 @@
       });
       const t = this;
       let o = !1,
-        n = null,
-        r = t.getAllFranchiseesFromLocalStorage();
-      if (this.component.disabled) return;
+        r = null;
+      if ((t.loadFranchisees(), this.component.disabled)) return;
       this._eventHandlers = this._eventHandlers || {};
-      const s = this.refs.storeInput,
-        a = this.refs.dropdownContainer,
-        i = this.refs.iconContainer,
-        c = () => {
-          a.style = l.stylesToCssString({ display: "none" });
+      const n = this.refs.storeInput,
+        s = this.refs.dropdownContainer,
+        a = this.refs.iconContainer,
+        i = () => {
+          s.style = l.stylesToCssString({ display: "none" });
         },
-        d = () => {
-          i.style = l.stylesToCssString(l.Styles.IconContainer, {
+        c = () => {
+          a.style = l.stylesToCssString(l.Styles.IconContainer, {
             display: "flex",
           });
         },
-        u = () => {
-          const e = s.value && "" !== s.value.trim();
-          i.innerHTML = e
+        d = () => {
+          const e = n.value && "" !== n.value.trim();
+          a.innerHTML = e
             ? `\n        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n          <path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41Z" fill="${l.Palette.IconColorBlack}" />\n        </svg>\n      `
             : `\n        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n          <path d="M12 4c2.2 0 4 1.79 4 4 0 2.27-2.13 5.65-4 8.06C10.13 13.65 8 10.27 8 8c0-2.21 1.8-4 4-4m0-2C8.69 2 6 4.69 6 8c0 4.5 6 11 6 11s6-6.5 6-11c0-3.31-2.69-6-6-6zm0 4c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5 20v2h14v-2H5z" fill="${l.Palette.IconColorBlack}" />\n        </svg>\n        `;
         },
-        p = (e, { writeLocalStorage: n } = {}) => {
+        u = (e, { writeLocalStorage: r } = {}) => {
           if (!e || !e.name)
             return void console.warn(
               "StoreLocator: applyStoreSelection called with invalid store",
               e,
             );
           ((e) => {
-            const n = e.name;
-            n && ((s.value = n), (o = !0), c(), d(), t.updateValue(n), u());
+            const r = e.name;
+            r && ((n.value = r), (o = !0), i(), c(), t.updateValue(r), d());
           })(e);
-          const a = e.id || e.store_id,
-            i = t.getFranchiseeByStoreId(a, r);
-          if (i) {
-            const o = i.bmqFormType || i.bmq_form_type,
-              n = i.email,
-              r = i.id;
-            ((e.bmq_form_type = o),
-              (e.bmqFormType = o),
-              t.updateFormComponentValue(l.FormComponentKeys.StoreFormType, o),
-              t.updateFormComponentValue(
-                l.FormComponentKeys.FranchiseeEmail,
-                n,
-              ),
-              t.updateFormComponentValue(l.FormComponentKeys.FranchiseeId, r));
-          } else console.warn("⚠️ No franchisee found for store:", a);
-          n && t.setLocalStorage(e);
+          const s = e.id || e.store_id;
+          (t.setStoreIdField(s),
+            t.applyFranchiseeForStore(s).then((o) => {
+              if (o) {
+                const t = o.bmqFormType || o.bmq_form_type;
+                ((e.bmq_form_type = t), (e.bmqFormType = t));
+              }
+              r && t.setLocalStorage(e);
+            }));
         };
       (() => {
         const e = t.getStoreFromLocalStorage();
         if (!e)
           return (
             console.log("No cached store found in localStorage"),
-            void u()
+            void d()
           );
-        const n = e.id || e.store_id,
-          a = t.getFranchiseeByStoreId(n, r),
-          i = e.name;
-        if (
-          (i &&
-            ((s.value = i),
-            (o = !0),
-            d(),
-            u(),
-            t.updateValue(i),
-            (t.pristine = !1)),
-          !a)
-        )
-          return void console.log(
-            "Franchisee not found for cached store, skipping field updates",
-          );
-        const c = a.bmqFormType || a.bmq_form_type,
-          p = a.email,
-          m = a.id,
-          g = () => {
-            (t.updateFormComponentValue(l.FormComponentKeys.StoreFormType, c),
-              t.updateFormComponentValue(
-                l.FormComponentKeys.FranchiseeEmail,
-                p,
-              ),
-              t.updateFormComponentValue(l.FormComponentKeys.FranchiseeId, m));
-            const o = { ...e, bmq_form_type: c, bmqFormType: c };
-            t.dispatchStoreSelectedEvent(o);
+        const r = e.id || e.store_id,
+          s = e.name;
+        s &&
+          ((n.value = s),
+          (o = !0),
+          c(),
+          d(),
+          t.updateValue(s),
+          (t.pristine = !1));
+        const a = () => {
+            (t.setStoreIdField(r),
+              t.applyFranchiseeForStore(r).then((o) => {
+                if (!o) return;
+                const r = o.bmqFormType || o.bmq_form_type;
+                t.dispatchStoreSelectedEvent({
+                  ...e,
+                  bmq_form_type: r,
+                  bmqFormType: r,
+                });
+              }));
           },
-          h = t.root && t.root.ready;
-        if (!h)
-          return (
-            console.log("No root form found, updating immediately"),
-            void g()
-          );
-        (console.log("Waiting for form.ready promise..."),
-          h.then(() => {
-            (console.log(
-              "Form ready! Performing update for FORM.IO components value.",
-            ),
-              g());
-          }));
+          i = t.root && t.root.ready;
+        i ? i.then(a) : a();
       })();
-      const m = (e) => {
+      const p = (e) => {
         const o = document.createElement("div"),
-          n = document.createElement("a");
+          r = document.createElement("a");
         return (
-          (n.innerText = e.name),
-          n.addEventListener("click", function (o) {
+          (r.innerText = e.name),
+          r.addEventListener("click", function (o) {
             (o.preventDefault(),
               o.stopPropagation(),
-              p(e, { writeLocalStorage: !0 }),
+              u(e, { writeLocalStorage: !0 }),
               t.dispatchStoreSelectedEvent(e));
           }),
-          (n.style = l.stylesToCssString(l.Styles.DropdownItem)),
-          o.appendChild(n),
+          (r.style = l.stylesToCssString(l.Styles.DropdownItem)),
+          o.appendChild(r),
           o
         );
       };
       return (
-        i.addEventListener("click", function (e) {
+        a.addEventListener("click", function (e) {
           (e.preventDefault(),
             e.stopPropagation(),
-            o || "" !== s.value
-              ? ((s.value = ""), (o = !1), c(), t.updateValue(""), u())
-              : s.focus());
+            o || "" !== n.value
+              ? ((n.value = ""),
+                (o = !1),
+                i(),
+                t.updateValue(""),
+                t.setStoreIdField(""),
+                d())
+              : n.focus());
         }),
-        s.addEventListener("focus", function () {
-          if (!o && s.value && "" !== s.value.trim()) return;
+        n.addEventListener("focus", function () {
+          if (!o && n.value && "" !== n.value.trim()) return;
           const e = o ? t.getStoreFromLocalStorage() : null,
-            n = (e && (e.postcode || e.post_code)) || "3000";
-          t.dispatchStoreSearchEvent(n);
+            r = (e && (e.postcode || e.post_code)) || "3000";
+          t.dispatchStoreSearchEvent(r);
         }),
-        s.addEventListener("input", function (e) {
-          const r = e.target.value;
-          ((t.userInput = r),
+        n.addEventListener("input", function (e) {
+          const n = e.target.value;
+          ((t.userInput = n),
             (o = !1),
             t.updateValue(""),
-            u(),
-            n && clearTimeout(n),
-            (n = setTimeout(() => {
-              t.dispatchStoreSearchEvent(r);
+            t.setStoreIdField(""),
+            d(),
+            r && clearTimeout(r),
+            (r = setTimeout(() => {
+              t.dispatchStoreSearchEvent(n);
             }, 500)));
         }),
         (this._eventHandlers.StoreSearchResults = (e) => {
           console.log("StoreSearchResults:", e.detail);
           ((e) => {
             (console.log("stores from filter and display stores", e),
-              (a.style = l.stylesToCssString(l.Styles.DropdownContainer, {
+              (s.style = l.stylesToCssString(l.Styles.DropdownContainer, {
                 display: "flex",
               })),
               (() => {
-                for (; a.firstChild; ) a.removeChild(a.firstChild);
+                for (; s.firstChild; ) s.removeChild(s.firstChild);
               })());
             const o = Array.isArray(e) ? e : [];
             if (0 === o.length) {
@@ -580,41 +641,41 @@
                   e
                 );
               })();
-              a.appendChild(e);
+              s.appendChild(e);
             } else {
               const e = document.createElement("div");
               ((e.innerText = "Select a store from the list to continue."),
                 (e.style = l.stylesToCssString(l.Styles.HintText)),
-                a.appendChild(e));
-              const t = o.map((e) => m(e));
-              a.append(...t);
+                s.appendChild(e));
+              const t = o.map((e) => p(e));
+              s.append(...t);
             }
-            const n = (() => {
+            const r = (() => {
               const e = t.getPreviousStoreFromLocalStorage();
               if (!e) return null;
               const o = document.createElement("div");
               o.style = l.stylesToCssString(l.Styles.PreviousStoreSection);
-              const n = document.createElement("div");
+              const r = document.createElement("div");
               return (
-                (n.innerText = "Previous Store"),
-                (n.style = l.stylesToCssString(l.Styles.PreviousStoreLabel)),
-                o.appendChild(n),
-                o.appendChild(m(e)),
+                (r.innerText = "Previous Store"),
+                (r.style = l.stylesToCssString(l.Styles.PreviousStoreLabel)),
+                o.appendChild(r),
+                o.appendChild(p(e)),
                 o
               );
             })();
-            (n && a.appendChild(n),
-              a.appendChild(
+            (r && s.appendChild(r),
+              s.appendChild(
                 (() => {
                   const e = document.createElement("div");
                   e.style = l.stylesToCssString(l.Styles.UseLocationContainer);
                   const o = document.createElement("span");
                   ((o.style = l.stylesToCssString(l.Styles.LocationIcon)),
                     (o.innerHTML = `\n        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${l.Palette.Primary.Main}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">\n          <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>\n        </svg>\n      `));
-                  const n = document.createElement("a");
+                  const r = document.createElement("a");
                   return (
-                    (n.innerText = "Use My Current Location"),
-                    (n.style = l.stylesToCssString(l.Styles.DropdownItem)),
+                    (r.innerText = "Use My Current Location"),
+                    (r.style = l.stylesToCssString(l.Styles.DropdownItem)),
                     e.addEventListener("click", function (e) {
                       (e.preventDefault(),
                         e.stopPropagation(),
@@ -630,7 +691,7 @@
                         }, 1500)));
                     }),
                     e.appendChild(o),
-                    e.appendChild(n),
+                    e.appendChild(r),
                     e
                   );
                 })(),
@@ -648,7 +709,7 @@
             ? (t._geolocateFallbackTimer &&
                 (clearTimeout(t._geolocateFallbackTimer),
                 (t._geolocateFallbackTimer = null)),
-              p(o, { writeLocalStorage: !1 }))
+              u(o, { writeLocalStorage: !1 }))
             : console.warn(
                 "StoreLocator: store.changed received without a valid store payload",
                 e && e.detail,
@@ -659,12 +720,14 @@
           this._eventHandlers.StoreChanged,
         ),
         (this._eventHandlers.DocumentMouseDown = (e) => {
-          const n = t.refs.storeLocator;
-          n &&
-            !n.contains(e.target) &&
+          const r = t.refs.storeLocator;
+          r &&
+            !r.contains(e.target) &&
             (console.log("[StoreLocator] outside click → closing dropdown"),
-            c(),
-            o || "" === s.value || ((s.value = ""), t.updateValue(""), u()));
+            i(),
+            o ||
+              "" === n.value ||
+              ((n.value = ""), t.updateValue(""), t.setStoreIdField(""), d()));
         }),
         document.addEventListener(
           "mousedown",
@@ -682,11 +745,11 @@
       try {
         const t = e.store_id || e.id,
           o = localStorage.getItem(l.LocalStorageKeys.MageCacheStorage);
-        let n = o ? JSON.parse(o) : {};
-        ((n[l.MageCacheStorageKeys.StoreLocation] = { ...e, id: t }),
+        let r = o ? JSON.parse(o) : {};
+        ((r[l.MageCacheStorageKeys.StoreLocation] = { ...e, id: t }),
           localStorage.setItem(
             l.LocalStorageKeys.MageCacheStorage,
-            JSON.stringify(n),
+            JSON.stringify(r),
           ));
       } catch (e) {
         console.error({
@@ -712,13 +775,13 @@
       try {
         const o = this.root;
         if (!o) return void console.warn("StoreLocator: No root form found");
-        const n = o.getComponent(e);
-        n && t
-          ? (n.setValue(t),
+        const r = o.getComponent(e);
+        r && t
+          ? (r.setValue(t),
             console.log(`✅ Updated ${e} with value:`, t),
-            n.triggerChange(),
+            r.triggerChange(),
             console.log(`✅ Triggered change event for ${e}`),
-            o.triggerChange({ changed: n }))
+            o.triggerChange({ changed: r }))
           : console.warn(`⚠️ Component ${e} not found or value is empty`);
       } catch (t) {
         console.error({
@@ -727,6 +790,13 @@
           error: t,
         });
       }
+    }
+    setStoreIdField(e) {
+      this.setFieldValue(l.FormComponentKeys.StoreId, e ? String(e) : "");
+    }
+    setFieldValue(e, t) {
+      const o = this.root && this.root.getComponent(e);
+      o && o.setValue(t);
     }
     detach() {
       return (
@@ -812,5 +882,5 @@
       return super.visible;
     }
   }
-  Formio.use([{ components: { rating: n, storeLocator: l } }]);
+  Formio.use([{ components: { rating: r, storeLocator: l } }]);
 })();
